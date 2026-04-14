@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Nav from "./components/Nav";
+import { PILLAR_META, PILLAR_LABELS } from "./lib/pillarMeta";
+import { useCompany } from "./lib/companyStore";
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -126,11 +128,206 @@ const PILLARS: Record<string, Record<string, string[]>> = {
       "Investeren in RPA (Robotic Process Automation)",
       "Digitaliseren van documentbeheer en interne communicatie",
     ],
-    "Financiële en fiscale optimalisatie":          [],
+    "Financiële en fiscale optimalisatie": [
+      "Structureren van intercompany transacties voor belastingefficiëntie",
+      "Integratie van financiële systemen en rapportering",
+      "Gebruik van schaalvoordelen bij bank- en verzekeringsdiensten",
+    ],
+  },
+  "Klantwaardecreatie": {
+    "Data-analyse en klantinzicht": [
+      "Centraal klantbeeld creëren via geïntegreerde CRM-systemen",
+      "Analyseren van klantgedrag, churn-risico en aankoopvoorkeuren",
+      "Segmentatie op basis van waarde, gedrag en behoeften",
+      "Voorspellende modellen inzetten voor retentie en upsell",
+    ],
+    "Verbetering van de klantbeleving": [
+      "Verbeteren van een verbeterd commercieel traject via het gezamenlijk aanbod",
+      "Uitrollen van klantgerichte training voor medewerkers",
+      "Gebruik van feedbackmomenten om processen aan te passen",
+      "Consistente merk- en servicebeleving over alle kanalen heen",
+    ],
+    "Verhoging van klantloyaliteit": [
+      "Lanceren van loyaliteitsprogramma's of klantclubs",
+      "Proactieve opvolging van tevredenheid en klachten",
+      "Inzetten op communityvorming en klantbetrokkenheid",
+      "Transparante communicatie over waarde en evoluties",
+    ],
+    "Ecosysteemontwikkeling en partnerships": [
+      "Samenwerkingen met complementaire dienstverleners",
+      "Integratie van derde partijen in de klantjourney (bv. via API's)",
+      "Gezamenlijke proposities of platformdiensten ontwikkelen",
+    ],
+    "Personalisatie en klantsegmentatie": [
+      "Gepersonaliseerde aanbiedingen op basis van klantdata",
+      "Dynamische content afgestemd op gebruikersprofiel",
+      "Relevante aanbevelingen via e-mail, app of website",
+    ],
+    "Optimalisatie van touchpoints en servicekanalen": [
+      "Optimaliseren van digitale contactpunten (website, app, chatbot)",
+      "Omnichannelstrategie met naadloze ervaring",
+      "Verkorten van responstijden en verhogen van bereikbaarheid",
+      "Zelfbedieningsopties voor eenvoudige klantvragen",
+    ],
+  },
+  "Innovatie en groei": {
+    "Investeren in nieuwe technologieën": [
+      "Inzetten op AI, IoT, blockchain of andere opkomende technologieën",
+      "Pilootprojecten opzetten met innovatieve toepassingen",
+      "Aankoop of integratie van technologische start-ups",
+      "Oprichten van innovatiehubs of testlabs",
+    ],
+    "Ontwikkelen van nieuwe producten of diensten": [
+      "Cocreatie met klanten of partners",
+      "Integreren van functionaliteiten uit overgenomen bedrijf",
+      "Klantgedreven innovatieprocessen opzetten",
+      "Opzetten van agile ontwikkelteams",
+    ],
+    "Innovatieve businessmodellen": [
+      "Shift van productverkoop naar abonnementsmodellen (SaaS, pay-per-use)",
+      "Platformdenken: verbinden van verschillende spelers op één dienst",
+      "Experimenteren met freemium of hybride verdienmodellen",
+    ],
+    "Digitale transformatie": [
+      "Digitaliseren van kernprocessen en interactie met klanten",
+      "Gebruik van data en analytics voor besluitvorming",
+      "Digitale customer journeys ontwikkelen",
+      "Automatiseren van marketing, sales en operations",
+    ],
+    "Bouwen aan ecosystemen en strategische allianties": [
+      "Opzetten van strategische partnerships met complementaire spelers",
+      "Delen van data, infrastructuur of klanten",
+      "Samen lanceren van geïntegreerde oplossingen of markten betreden",
+    ],
+    "Versnellen van time to market": [
+      "Kortere ontwikkelcycli via agile methodes",
+      "Snellere integratie van innovaties in bestaande structuren",
+      "Minimal viable products (MVP's) sneller lanceren en testen",
+      "Gebruik van incubators of venture programma's",
+    ],
+  },
+  "Human capital": {
+    "Talentontwikkeling en opleiding": [
+      "Uitrollen van interne opleidingsprogramma's of academies",
+      "Opstellen van groeiplannen per functie of individu",
+      "Competentie-assessments en gepersonaliseerde leerlijnen",
+      "Investeren in digitale leerplatformen",
+    ],
+    "Verhogen van medewerkersbetrokkenheid": [
+      "Regelmatige pulse surveys en feedbackmomenten",
+      "Betrekken van medewerkers bij integratieprojecten",
+      "Vier successen en mijlpalen zichtbaar",
+      "Inzetten op interne communicatie en transparantie",
+    ],
+    "Automatisatie van repetitieve hr-taken": [
+      "Digitaliseren van onboarding, tijdsregistratie en verlofaanvragen",
+      "Invoeren van self-service hr-tools",
+      "Automatiseren van repetitieve administratieve processen",
+      "Integratie van hr-systemen (bv. payroll, evaluaties)",
+    ],
+    "Retentie en behoud van sleutelmedewerkers": [
+      "Identificeren van kritieke profielen",
+      "Invoeren van retentiebonussen of langetermijnincentives",
+      "Aanbieden van loopbaanontwikkeling en perspectief",
+      "Transparante communicatie over de toekomst",
+    ],
+    "Cultuurintegratie en alignment": [
+      "Workshops rond gedeelde waarden en gedragingen",
+      "Formuleren van een gezamenlijke cultuurvisie",
+      "Cultuurbarometer en follow-up",
+      "Aanstelling van cultuurambassadeurs of changeteams",
+    ],
+    "Leiderschapsontwikkeling en coaching": [
+      "Coachingstrajecten voor nieuwe en bestaande leiders",
+      "Peer learning en mentorprogramma's",
+      "Ondersteuning in change leadership",
+      "Objectieve evaluatie van leiderschapscompetenties",
+    ],
+  },
+  "Duurzaamheid": {
+    "Circulaire processen en afvalreductie": [
+      "Invoeren van hergebruik, recyclage of refurbishingprocessen",
+      "Verminderen van verpakkingsmateriaal",
+      "Ontwerpen van producten voor langere levensduur",
+      "Samenwerkingen met circulaire partners opzetten",
+    ],
+    "CO2-reductie en energie-efficiëntie": [
+      "Investeren in energie-efficiënte installaties en gebouwen",
+      "Overschakelen op hernieuwbare energie",
+      "Optimaliseren van transport en logistiek",
+      "Invoeren van energiemanagementsystemen",
+    ],
+    "ESG-strategieën en compliance": [
+      "Ontwikkelen van een ESG-beleid afgestemd op sector en stakeholders",
+      "Opvolging van sociale, ecologische en governance KPI's",
+      "Integratie van ESG-criteria in besluitvorming en investeringen",
+      "Voldoen aan CSRD, SFDR of andere wetgeving",
+    ],
+    "Duurzame supply chain": [
+      "Beoordeling van leveranciers op duurzaamheid",
+      "Verduurzamen van grondstoffen en transportmiddelen",
+      "Inzetten op lokale of ethisch verantwoorde sourcing",
+      "Samenwerkingen rond ketentransparantie en CO2-inzicht",
+    ],
+    "Rapportering en transparantie": [
+      "Publicatie van duurzaamheidsverslagen",
+      "Rapportering volgens internationale standaarden (GRI, ESRS)",
+      "Transparante communicatie naar klanten, investeerders en medewerkers",
+      "Gebruik van dashboards om impact zichtbaar te maken",
+    ],
+    "Bewustmaking en betrokkenheid van medewerkers": [
+      "Organiseren van duurzaamheidsworkshops en challenges",
+      "Inzetten op intern ambassadeurschap",
+      "Link leggen tussen duurzame initiatieven en bedrijfswaarden",
+      "Incentives voor groene ideeën of gedragsverandering",
+    ],
+  },
+  "Financiële optimalisatie": {
+    "Optimalisatie van kapitaalstructuur": [
+      "Evaluatie van debt/equity-verhouding",
+      "Herfinanciering tegen gunstigere voorwaarden",
+      "Inzetten van overtollige cash voor strategische investeringen",
+      "Optimaliseren van dividendbeleid en kapitaalreserves",
+    ],
+    "Beheer van werkkapitaal": [
+      "Versnellen van debiteureninning",
+      "Vertragen van betalingen aan leveranciers binnen redelijke grenzen",
+      "Optimaliseren van voorraadrotatie en voorraadniveaus",
+      "Invoeren van gecentraliseerd werkkapitaalbeheer",
+    ],
+    "Schuldenstructuur en financieringsstrategie": [
+      "Consolidatie van bestaande leningen en kredietlijnen",
+      "Optimaliseren van rente- en aflossingsstructuren",
+      "Inzetten op alternatieve financieringsvormen (lease, factoring, enz.)",
+      "Onderhandelen met banken voor betere convenanten",
+    ],
+    "Integratie van financiële systemen en rapportering": [
+      "Harmoniseren van rapporteringsstandaarden en KPI's",
+      "Integreren van boekhoudsystemen en analytische rapportering",
+      "Implementeren van geconsolideerde dashboards en forecastingtools",
+    ],
+    "Cashflowbeheer en liquiditeitsplanning": [
+      "Uitrollen van cash forecasting op groepsniveau",
+      "Identificeren van cash drains en optimalisatie-opportuniteiten",
+      "Centraliseren van cashposities (cash pooling)",
+      "Invoeren van scenario-analyses voor financiële stressmodellen",
+    ],
+    "Fiscaliteit en juridische structuren": [
+      "Herstructurering van juridische entiteiten",
+      "Optimaliseren van fiscale consolidatie en verliezencompensatie",
+      "In kaart brengen van internationale fiscale impact",
+      "Structureren van intragroeptransacties voor efficiëntie",
+    ],
   },
 };
 
 const PILLAR_NAMES  = Object.keys(PILLARS);
+
+// PILLAR_META and PILLAR_LABELS are imported from ./lib/pillarMeta
+
+// Sentinel value used when the user chooses to type their own action
+const CUSTOM_ACTION_VALUE = "__custom__";
+const CUSTOM_ACTION_LABEL = "Eigen actie invullen...";
 
 const PRIORITIES = [
   "Mandatory - 100 days",
@@ -161,14 +358,15 @@ interface Row {
   pillar: string;
   initiative: string;
   action: string;
+  customAction: string;  // typed text when action === CUSTOM_ACTION_VALUE
   priority: string;
   owner: string;
 }
 
-let nextId = 1;
-
-function emptyRow(): Row {
-  return { id: nextId++, pillar: "", initiative: "", action: "", priority: "", owner: "" };
+/** Generates an empty row with an ID one higher than the current max. */
+function emptyRow(currentRows: Row[] = []): Row {
+  const id = currentRows.length === 0 ? 1 : Math.max(...currentRows.map((r) => r.id)) + 1;
+  return { id, pillar: "", initiative: "", action: "", customAction: "", priority: "", owner: "" };
 }
 
 // ── Select component ──────────────────────────────────────────────────────────
@@ -179,26 +377,43 @@ function Select({
   options,
   placeholder,
   disabled,
+  extraOption,
+  optionLabels,
+  accentColor,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: readonly string[];
   placeholder: string;
   disabled?: boolean;
+  extraOption?: { value: string; label: string };
+  /** Optional display-label overrides: { [optionValue]: displayText } */
+  optionLabels?: Record<string, string>;
+  /** When set and a value is selected, tints the border with this color */
+  accentColor?: string;
 }) {
+  const accentStyle: React.CSSProperties | undefined =
+    accentColor && value
+      ? { borderColor: accentColor, boxShadow: `0 0 0 1px ${accentColor}30` }
+      : undefined;
+
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
+      style={accentStyle}
       className={`w-full rounded-lg border px-3 py-2 text-sm leading-tight transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
         ${disabled ? "cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200" : "bg-white border-gray-300 text-gray-800 hover:border-blue-400"}
         ${!value ? "text-gray-400" : "text-gray-800"}`}
     >
       <option value="" disabled hidden>{placeholder}</option>
       {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
+        <option key={opt} value={opt}>{optionLabels?.[opt] ?? opt}</option>
       ))}
+      {extraOption && (
+        <option value={extraOption.value}>{extraOption.label}</option>
+      )}
     </select>
   );
 }
@@ -206,51 +421,39 @@ function Select({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ValueCreationPage() {
-  const [rows, setRows] = useState<Row[]>([emptyRow()]);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("value-creation-actions");
-      if (stored) {
-        const parsed = JSON.parse(stored) as Row[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          nextId = Math.max(...parsed.map((r) => r.id)) + 1;
-          // Back-compat: old rows have no pillar field
-          setRows(parsed.map((r) => ({ ...{ pillar: "" }, ...r })));
-        }
-      }
-    } catch { /* corrupted — keep default */ }
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    try { localStorage.setItem("value-creation-actions", JSON.stringify(rows)); }
-    catch { /* unavailable */ }
-  }, [rows, mounted]);
+  // ── Company context replaces all local localStorage logic ─────────────────
+  const { mounted, companyData, setRows } = useCompany();
+  const rows = companyData.rows as Row[];
 
   function updateRow(id: number, patch: Partial<Row>) {
-    setRows((prev) =>
-      prev.map((r) => {
+    setRows(
+      rows.map((r) => {
         if (r.id !== id) return r;
         const updated = { ...r, ...patch };
         // Cascade resets down the hierarchy
-        if ("pillar" in patch) { updated.initiative = ""; updated.action = ""; }
-        if ("initiative" in patch) { updated.action = ""; }
+        if ("pillar" in patch) { updated.initiative = ""; updated.action = ""; updated.customAction = ""; }
+        if ("initiative" in patch) { updated.action = ""; updated.customAction = ""; }
+        // customAction is intentionally NOT reset when only action changes,
+        // so the user can switch back to CUSTOM_ACTION_VALUE and recover their text.
         return updated;
       })
     );
   }
 
-  function addRow() { setRows((prev) => [...prev, emptyRow()]); }
+  function addRow() { setRows([...rows, emptyRow(rows)]); }
   function removeRow(id: number) {
-    setRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== id) : prev);
+    if (rows.length > 1) setRows(rows.filter((r) => r.id !== id));
   }
 
-  const displayRows = mounted ? rows : [emptyRow()];
+  // Stable display rows: one placeholder row during SSR / before mount
+  const [ssrPlaceholder] = useState<Row[]>([emptyRow()]);
+  const displayRows = mounted ? rows : ssrPlaceholder;
   const filledCount = mounted
-    ? rows.filter((r) => r.pillar && r.initiative && r.action && r.priority && r.owner).length
+    ? rows.filter((r) => {
+        const actionFilled =
+          r.action === CUSTOM_ACTION_VALUE ? !!r.customAction.trim() : !!r.action;
+        return r.pillar && r.initiative && actionFilled && r.priority && r.owner;
+      }).length
     : 0;
 
   return (
@@ -302,11 +505,11 @@ export default function ValueCreationPage() {
               return (
                 <div
                   key={row.id}
-                  className="grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_1fr_auto] gap-3 items-center px-6 py-4 hover:bg-blue-50/30 transition-colors group"
+                  className="grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_1fr_auto] gap-3 items-start px-6 py-4 hover:bg-blue-50/30 transition-colors group"
                 >
                   {/* Row number + Pillar */}
-                  <div className="flex items-center gap-2">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-xs font-medium flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-xs font-medium flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors mt-px">
                       {idx + 1}
                     </span>
                     <Select
@@ -314,6 +517,8 @@ export default function ValueCreationPage() {
                       onChange={(v) => updateRow(row.id, { pillar: v })}
                       options={PILLAR_NAMES}
                       placeholder="Pillar…"
+                      optionLabels={PILLAR_LABELS}
+                      accentColor={PILLAR_META[row.pillar]?.color}
                     />
                   </div>
 
@@ -327,19 +532,32 @@ export default function ValueCreationPage() {
                   />
 
                   {/* Action */}
-                  <Select
-                    value={row.action}
-                    onChange={(v) => updateRow(row.id, { action: v })}
-                    options={actionOptions}
-                    placeholder={
-                      !row.initiative
-                        ? "Kies initiatief eerst"
-                        : actionOptions.length === 0
-                        ? "Nog geen acties"
-                        : "Actie…"
-                    }
-                    disabled={!row.initiative || actionOptions.length === 0}
-                  />
+                  <div className="flex flex-col gap-1.5">
+                    <Select
+                      value={row.action}
+                      onChange={(v) => updateRow(row.id, { action: v })}
+                      options={actionOptions}
+                      placeholder={
+                        !row.initiative
+                          ? "Kies initiatief eerst"
+                          : actionOptions.length === 0
+                          ? "Nog geen acties"
+                          : "Actie…"
+                      }
+                      disabled={!row.initiative}
+                      extraOption={row.initiative ? { value: CUSTOM_ACTION_VALUE, label: CUSTOM_ACTION_LABEL } : undefined}
+                    />
+                    {row.action === CUSTOM_ACTION_VALUE && (
+                      <input
+                        type="text"
+                        value={row.customAction}
+                        onChange={(e) => updateRow(row.id, { customAction: e.target.value })}
+                        placeholder="Omschrijf je eigen actie…"
+                        className="w-full rounded-lg border border-blue-300 bg-blue-50/50 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+                        autoFocus
+                      />
+                    )}
+                  </div>
 
                   {/* Priority */}
                   <Select

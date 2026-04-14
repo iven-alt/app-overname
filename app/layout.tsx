@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { CompanyProvider } from "./lib/companyStore";
 
 export const metadata: Metadata = {
   title: "Value Creation App",
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="nl">
-      <body className="bg-gray-50 text-gray-900 antialiased">{children}</body>
+      <body className="bg-gray-50 text-gray-900 antialiased">
+        <CompanyProvider>
+          {children}
+        </CompanyProvider>
+      </body>
     </html>
   );
 }

@@ -3,7 +3,14 @@
     "allow": [
       "Bash(cmd /c \"node --version\" 2>&1; cmd /c \"npm --version\" 2>&1; cmd /c \"npx --version\" 2>&1)",
       "Bash(powershell -Command \"Set-Location 'C:\\\\Users\\\\Guest\\\\value-creation-app'; npm run build 2>&1 | Select-Object -Last 15\")",
-      "Bash(powershell -Command \"Set-Location 'C:\\\\Users\\\\Guest\\\\value-creation-app'; npm run build 2>&1 | Select-Object -Last 10\")"
+      "Bash(powershell -Command \"Set-Location 'C:\\\\Users\\\\Guest\\\\value-creation-app'; npm run build 2>&1 | Select-Object -Last 10\")",
+      "Bash(node -e \"console.log\\(process.env.PATH\\)\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(npm run:*)",
+      "Read(//usr/bin/**)",
+      "Bash(echo \"shell: $SHELL\")"
     ]
   }
 }

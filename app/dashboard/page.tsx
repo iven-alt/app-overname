@@ -1,16 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+// (no local state needed — all data comes from CompanyContext)
 import Nav from "../components/Nav";
+import { PILLAR_META } from "../lib/pillarMeta";
+import { useCompany } from "../lib/companyStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ActionRow {
   id: number;
+  pillar?: string;        // set on rows saved after pillar support was added
   initiative: string;
   action: string;
+  customAction?: string;  // present when action === "__custom__"
   priority: string;
   owner: string;
+}
+
+const CUSTOM_ACTION = "__custom__";
+
+/** Returns the text to display for an action row (handles custom actions). */
+function resolveAction(row: ActionRow): string {
+  return row.action === CUSTOM_ACTION ? (row.customAction?.trim() || "") : row.action;
 }
 
 interface ActionExtra {
@@ -18,16 +29,6 @@ interface ActionExtra {
   progress: string;
   startDate: string;
   endDate: string;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function loadJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch { /* corrupted */ }
-  return fallback;
 }
 
 /** Convert a progress string like "75%" to a number 0–100. */
@@ -42,6 +43,14 @@ interface OwnerStat {
   total: number;
   done: number;           // actions at 100%
   avgProgress: number;    // average of all progress values
+}
+
+/** Pillar-level stats */
+interface PillarStat {
+  pillar: string;
+  total: number;
+  done: number;
+  avgProgress: number;
 }
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
@@ -95,21 +104,55 @@ function OwnerRow({ stat }: { stat: OwnerStat }) {
   );
 }
 
+// ── Pillar progress row ───────────────────────────────────────────────────────
+
+function PillarRow({ stat }: { stat: PillarStat }) {
+  const meta = PILLAR_META[stat.pillar];
+  const pct  = stat.avgProgress;
+  const color = meta?.color ?? "#6B7280";
+
+  return (
+    <div className="flex items-center gap-4 py-3">
+      {/* Icon badge */}
+      <div
+        className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-base leading-none"
+        style={{ backgroundColor: `${color}18` }}
+      >
+        {meta?.icon ?? "●"}
+      </div>
+
+      {/* Name + bar */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between mb-1">
+          <span className="text-sm font-semibold text-gray-800 truncate">{stat.pillar}</span>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            <span className="text-sm font-bold text-gray-700 tabular-nums w-10 text-right">{pct}%</span>
+            <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+              {stat.done} / {stat.total} voltooid
+            </span>
+          </div>
+        </div>
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, backgroundColor: color }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
-  const [actions, setActions] = useState<ActionRow[]>([]);
-  const [extras,  setExtras]  = useState<Record<number, ActionExtra>>({});
+  // ── Company context replaces all local localStorage logic ─────────────────
+  const { mounted, companyData } = useCompany();
+  const actions = companyData.rows   as ActionRow[];
+  const extras  = companyData.extras as Record<number, ActionExtra>;
 
-  useEffect(() => {
-    setActions(loadJSON<ActionRow[]>("value-creation-actions", []));
-    setExtras(loadJSON<Record<number, ActionExtra>>("first-100-days-extras", {}));
-    setMounted(true);
-  }, []);
-
-  // Only consider fully defined actions (have owner + action text)
-  const filledActions = actions.filter((r) => r.owner && r.action);
+  // Only consider fully defined actions (have owner + resolved action text)
+  const filledActions = actions.filter((r) => r.owner && !!resolveAction(r));
 
   // Overall KPIs
   const totalActions = filledActions.length;
@@ -134,6 +177,24 @@ export default function DashboardPage() {
     .map((s) => ({ ...s, avgProgress: Math.round(s.avgProgress / s.total) }))
     .sort((a, b) => b.avgProgress - a.avgProgress); // most progress first
 
+  // Per-pillar stats — only include pillars that have at least one action
+  const pillarOrder = Object.keys(PILLAR_META); // fixed canonical order
+  const pillarMap = filledActions
+    .filter((r) => !!r.pillar)
+    .reduce<Record<string, PillarStat>>((acc, row) => {
+      const p = row.pillar!;
+      if (!acc[p]) acc[p] = { pillar: p, total: 0, done: 0, avgProgress: 0 };
+      const progress = pctValue(extras[row.id]?.progress);
+      acc[p].total += 1;
+      if (progress === 100) acc[p].done += 1;
+      acc[p].avgProgress += progress;
+      return acc;
+    }, {});
+
+  const pillarStats: PillarStat[] = Object.values(pillarMap)
+    .map((s) => ({ ...s, avgProgress: Math.round(s.avgProgress / s.total) }))
+    .sort((a, b) => pillarOrder.indexOf(a.pillar) - pillarOrder.indexOf(b.pillar));
+
   // Attention needed: actions missing progress, owner, or end date
   interface FlaggedAction {
     id: number;
@@ -148,7 +209,7 @@ export default function DashboardPage() {
       if (!ex?.progress || pctValue(ex.progress) === 0) issues.push("No progress");
       if (!ex?.assignedTo?.trim()) issues.push("No owner assigned");
       if (!ex?.endDate) issues.push("No end date");
-      return { id: row.id, action: row.action, owner: row.owner, issues };
+      return { id: row.id, action: resolveAction(row), owner: row.owner, issues };
     })
     .filter((r) => r.issues.length > 0)
     .sort((a, b) => b.issues.length - a.issues.length); // most issues first
@@ -198,6 +259,21 @@ export default function DashboardPage() {
             sub="gedefinieerd in Sheet 1"
           />
         </div>
+
+        {/* Per-pillar progress */}
+        {pillarStats.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-800">Progress per Pillar</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Sorted by pillar category</p>
+            </div>
+            <div className="px-6 divide-y divide-gray-100">
+              {pillarStats.map((stat) => (
+                <PillarRow key={stat.pillar} stat={stat} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Per-owner progress */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

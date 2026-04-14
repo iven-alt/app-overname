@@ -1,16 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Nav from "../components/Nav";
+import { PILLAR_META } from "../lib/pillarMeta";
+import { useCompany } from "../lib/companyStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ActionRow {
   id: number;
+  pillar?: string;        // set on rows saved after pillar support was added
   initiative: string;
   action: string;
+  customAction?: string;  // present when action === "__custom__"
   priority: string;
   owner: string;
+}
+
+const CUSTOM_ACTION = "__custom__";
+
+/** Returns the text to display for an action row (handles custom actions). */
+function resolveAction(row: ActionRow): string {
+  return row.action === CUSTOM_ACTION ? (row.customAction?.trim() || "") : row.action;
 }
 
 interface ActionExtra {
@@ -48,25 +59,6 @@ const PRIORITY_BADGE: Record<string, { label: string; className: string }> = {
   "Low - Due Dilligence":    { label: "Low",        className: "bg-gray-100 text-gray-500" },
   "Continuous Improvement":  { label: "CI",         className: "bg-blue-100 text-blue-700" },
 };
-
-const LS_ACTIONS = "value-creation-actions";
-const LS_EXTRAS  = "first-100-days-extras";
-const LS_HEADER  = "first-100-days-header";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function loadJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch { /* corrupted */ }
-  return fallback;
-}
-
-function saveJSON(key: string, value: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(value)); }
-  catch { /* unavailable */ }
-}
 
 /** Days between two ISO date strings (dateB - dateA). */
 function daysBetween(a: string, b: string): number {
@@ -139,35 +131,31 @@ function TimelineRuler({ totalDays }: { totalDays: number }) {
 const COLS = "grid-cols-[1.5fr_2.5fr_1.2fr_1.2fr_1.2fr_1.2fr_3fr]";
 
 export default function First100DaysPage() {
-  const [mounted, setMounted] = useState(false);
-  const [actions, setActions] = useState<ActionRow[]>([]);
-  const [extras,  setExtras]  = useState<Record<number, ActionExtra>>({});
-  const [header,  setHeader]  = useState<Header>({ companyName: "", projectStartDate: "" });
-  const [filter,  setFilter]  = useState("All");
+  // ── Company context replaces all local localStorage logic ─────────────────
+  const {
+    mounted,
+    companyData,
+    setExtras: saveExtras,
+    setHeader: saveHeader,
+  } = useCompany();
 
-  useEffect(() => {
-    setActions(loadJSON<ActionRow[]>(LS_ACTIONS, []));
-    setExtras(loadJSON<Record<number, ActionExtra>>(LS_EXTRAS, {}));
-    setHeader(loadJSON<Header>(LS_HEADER, { companyName: "", projectStartDate: "" }));
-    setMounted(true);
-  }, []);
+  const actions = companyData.rows   as ActionRow[];
+  const extras  = companyData.extras as Record<number, ActionExtra>;
+  const header  = companyData.header as Header;
 
-  useEffect(() => { if (mounted) saveJSON(LS_HEADER, header); }, [header, mounted]);
-  useEffect(() => { if (mounted) saveJSON(LS_EXTRAS, extras); }, [extras, mounted]);
+  const [filter, setFilter] = useState("All");
 
   function updateHeader(patch: Partial<Header>) {
-    setHeader((prev) => ({ ...prev, ...patch }));
+    saveHeader(patch);
   }
 
   function updateExtra(id: number, patch: Partial<ActionExtra>) {
-    setExtras((prev) => ({
-      ...prev,
-      [id]: { ...{ assignedTo: "", progress: "", startDate: "", endDate: "" }, ...prev[id], ...patch },
-    }));
+    const current = extras[id] ?? { assignedTo: "", progress: "", startDate: "", endDate: "" };
+    saveExtras({ ...extras, [id]: { ...current, ...patch } });
   }
 
   const filledActions = actions
-    .filter((r) => r.owner && r.action)
+    .filter((r) => r.owner && !!resolveAction(r))
     .filter((r) => {
       if (filter === "All") return true;
       const badge = PRIORITY_BADGE[r.priority];
@@ -206,7 +194,7 @@ export default function First100DaysPage() {
   const doneActions  = filledActions.filter((r) => extras[r.id]?.progress === "100%").length;
 
   // Overall progress counts across all actions (ignores active filter)
-  const allFilledActions = actions.filter((r) => r.owner && r.action);
+  const allFilledActions = actions.filter((r) => r.owner && !!resolveAction(r));
   const allTotal = allFilledActions.length;
   const allDone  = allFilledActions.filter((r) => extras[r.id]?.progress === "100%").length;
   const progressPct = allTotal > 0 ? Math.round((allDone / allTotal) * 100) : 0;
@@ -366,8 +354,13 @@ export default function First100DaysPage() {
             <div className="divide-y divide-gray-100">
               {groups[owner].map((row) => {
                 const ex = extras[row.id] ?? { assignedTo: "", progress: "", startDate: "", endDate: "" };
+                const pillarMeta = row.pillar ? PILLAR_META[row.pillar] : undefined;
                 return (
-                  <div key={row.id} className={`grid ${COLS} gap-3 items-center px-6 py-3 hover:bg-blue-50/30 transition-colors`}>
+                  <div
+                    key={row.id}
+                    className={`grid ${COLS} gap-3 items-center px-6 py-3 hover:bg-blue-50/30 transition-colors`}
+                    style={{ borderLeft: `3px solid ${pillarMeta?.color ?? "transparent"}` }}
+                  >
                     <span className="text-xs text-gray-500 truncate" title={row.initiative}>
                       {row.initiative}
                     </span>
@@ -377,9 +370,20 @@ export default function First100DaysPage() {
                           {PRIORITY_BADGE[row.priority].label}
                         </span>
                       )}
-                      <span className="text-sm text-gray-800 leading-snug" title={row.action}>
-                        {row.action}
+                      <span className="text-sm text-gray-800 leading-snug" title={resolveAction(row)}>
+                        {resolveAction(row)}
                       </span>
+                      {pillarMeta && (
+                        <span
+                          className="self-start mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                          style={{
+                            color: pillarMeta.color,
+                            backgroundColor: `${pillarMeta.color}18`,
+                          }}
+                        >
+                          {pillarMeta.icon} {row.pillar}
+                        </span>
+                      )}
                     </div>
 
                     {/* Assigned to */}
