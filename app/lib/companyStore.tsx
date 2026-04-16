@@ -38,7 +38,7 @@ function nowISO(): string {
 
 /** One empty starter row for a fresh company */
 function starterRow(): Row {
-  return { id: 1, pillar: "", initiative: "", action: "", customAction: "", priority: "", owner: "" };
+  return { id: 1, pillar: "", customPillar: "", initiative: "", customInitiative: "", action: "", customAction: "", priority: "", owner: "" };
 }
 
 /** Default empty data for a new company */

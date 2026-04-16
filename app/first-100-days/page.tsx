@@ -9,17 +9,31 @@ import { useCompany } from "../lib/companyStore";
 
 interface ActionRow {
   id: number;
-  pillar?: string;        // set on rows saved after pillar support was added
+  pillar?: string;             // set on rows saved after pillar support was added
+  customPillar?: string;       // present when pillar === "__custom_pillar__"
   initiative: string;
+  customInitiative?: string;   // present when initiative === "__custom_initiative__"
   action: string;
-  customAction?: string;  // present when action === "__custom__"
+  customAction?: string;       // present when action === "__custom__"
   priority: string;
   owner: string;
 }
 
-const CUSTOM_ACTION = "__custom__";
+const CUSTOM_PILLAR     = "__custom_pillar__";
+const CUSTOM_INITIATIVE = "__custom_initiative__";
+const CUSTOM_ACTION     = "__custom__";
 
-/** Returns the text to display for an action row (handles custom actions). */
+/** Returns the display text for pillar (handles custom pillars). */
+function resolvePillar(row: ActionRow): string {
+  return row.pillar === CUSTOM_PILLAR ? (row.customPillar?.trim() || "") : (row.pillar || "");
+}
+
+/** Returns the display text for initiative (handles custom initiatives). */
+function resolveInitiative(row: ActionRow): string {
+  return row.initiative === CUSTOM_INITIATIVE ? (row.customInitiative?.trim() || "") : row.initiative;
+}
+
+/** Returns the display text for action (handles custom actions). */
 function resolveAction(row: ActionRow): string {
   return row.action === CUSTOM_ACTION ? (row.customAction?.trim() || "") : row.action;
 }
@@ -134,6 +148,8 @@ export default function First100DaysPage() {
   // ── Company context replaces all local localStorage logic ─────────────────
   const {
     mounted,
+    companies,
+    selectedCompanyId,
     companyData,
     setExtras: saveExtras,
     setHeader: saveHeader,
@@ -142,6 +158,9 @@ export default function First100DaysPage() {
   const actions = companyData.rows   as ActionRow[];
   const extras  = companyData.extras as Record<number, ActionExtra>;
   const header  = companyData.header as Header;
+
+  // Company name comes from the workspace, not from the header field
+  const companyName = companies.find((c) => c.id === selectedCompanyId)?.name ?? "";
 
   const [filter, setFilter] = useState("All");
 
@@ -219,10 +238,10 @@ export default function First100DaysPage() {
 
           {/* Left: title + progress */}
           <div className="flex-1 min-w-0">
-            {/* Breadcrumb */}
+            {/* Breadcrumb — uses selected company name as single source of truth */}
             <p className="text-xs text-gray-400 mb-1">
-              {header.companyName
-                ? <><span className="font-medium text-blue-600">{header.companyName}</span> · Integration Execution Plan</>
+              {companyName
+                ? <><span className="font-medium text-blue-600">{companyName}</span> · Integration Execution Plan</>
                 : "Integration Execution Plan"}
             </p>
             {/* Title + subtitle */}
@@ -257,30 +276,16 @@ export default function First100DaysPage() {
           <div className="hidden sm:block w-px self-stretch bg-gray-200" />
 
           {/* Right: project meta inputs */}
-          <div className="flex-shrink-0 flex items-center gap-3">
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
-                Bedrijf
-              </label>
-              <input
-                type="text"
-                value={header.companyName}
-                onChange={(e) => updateHeader({ companyName: e.target.value })}
-                placeholder="Bedrijfsnaam…"
-                className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white hover:border-blue-400 transition-colors w-36"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
-                Startdatum
-              </label>
-              <input
-                type="date"
-                value={header.projectStartDate}
-                onChange={(e) => updateHeader({ projectStartDate: e.target.value })}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white hover:border-blue-400 transition-colors"
-              />
-            </div>
+          <div className="flex-shrink-0">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
+              Startdatum
+            </label>
+            <input
+              type="date"
+              value={header.projectStartDate}
+              onChange={(e) => updateHeader({ projectStartDate: e.target.value })}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white hover:border-blue-400 transition-colors"
+            />
           </div>
 
           {/* Divider */}
@@ -361,8 +366,8 @@ export default function First100DaysPage() {
                     className={`grid ${COLS} gap-3 items-center px-6 py-3 hover:bg-blue-50/30 transition-colors`}
                     style={{ borderLeft: `3px solid ${pillarMeta?.color ?? "transparent"}` }}
                   >
-                    <span className="text-xs text-gray-500 truncate" title={row.initiative}>
-                      {row.initiative}
+                    <span className="text-xs text-gray-500 truncate" title={resolveInitiative(row)}>
+                      {resolveInitiative(row)}
                     </span>
                     <div className="flex flex-col gap-1">
                       {PRIORITY_BADGE[row.priority] && (
@@ -373,15 +378,15 @@ export default function First100DaysPage() {
                       <span className="text-sm text-gray-800 leading-snug" title={resolveAction(row)}>
                         {resolveAction(row)}
                       </span>
-                      {pillarMeta && (
+                      {(pillarMeta || row.pillar === CUSTOM_PILLAR) && (
                         <span
                           className="self-start mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none"
-                          style={{
-                            color: pillarMeta.color,
-                            backgroundColor: `${pillarMeta.color}18`,
-                          }}
+                          style={pillarMeta
+                            ? { color: pillarMeta.color, backgroundColor: `${pillarMeta.color}18` }
+                            : { color: "#6B7280",        backgroundColor: "#F3F4F6" }
+                          }
                         >
-                          {pillarMeta.icon} {row.pillar}
+                          {pillarMeta ? `${pillarMeta.icon} ` : ""}{resolvePillar(row)}
                         </span>
                       )}
                     </div>

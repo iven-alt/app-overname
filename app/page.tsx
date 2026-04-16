@@ -325,9 +325,13 @@ const PILLAR_NAMES  = Object.keys(PILLARS);
 
 // PILLAR_META and PILLAR_LABELS are imported from ./lib/pillarMeta
 
-// Sentinel value used when the user chooses to type their own action
-const CUSTOM_ACTION_VALUE = "__custom__";
-const CUSTOM_ACTION_LABEL = "Eigen actie invullen...";
+// Sentinel values used when the user chooses to type their own pillar / initiative / action
+const CUSTOM_PILLAR_VALUE     = "__custom_pillar__";
+const CUSTOM_PILLAR_LABEL     = "Eigen pillar invullen...";
+const CUSTOM_INITIATIVE_VALUE = "__custom_initiative__";
+const CUSTOM_INITIATIVE_LABEL = "Eigen initiatief invullen...";
+const CUSTOM_ACTION_VALUE     = "__custom__";
+const CUSTOM_ACTION_LABEL     = "Eigen actie invullen...";
 
 const PRIORITIES = [
   "Mandatory - 100 days",
@@ -356,9 +360,11 @@ const FUNCTIONAL_OWNERS = [
 interface Row {
   id: number;
   pillar: string;
+  customPillar: string;      // typed text when pillar === CUSTOM_PILLAR_VALUE
   initiative: string;
+  customInitiative: string;  // typed text when initiative === CUSTOM_INITIATIVE_VALUE
   action: string;
-  customAction: string;  // typed text when action === CUSTOM_ACTION_VALUE
+  customAction: string;      // typed text when action === CUSTOM_ACTION_VALUE
   priority: string;
   owner: string;
 }
@@ -366,7 +372,7 @@ interface Row {
 /** Generates an empty row with an ID one higher than the current max. */
 function emptyRow(currentRows: Row[] = []): Row {
   const id = currentRows.length === 0 ? 1 : Math.max(...currentRows.map((r) => r.id)) + 1;
-  return { id, pillar: "", initiative: "", action: "", customAction: "", priority: "", owner: "" };
+  return { id, pillar: "", customPillar: "", initiative: "", customInitiative: "", action: "", customAction: "", priority: "", owner: "" };
 }
 
 // ── Select component ──────────────────────────────────────────────────────────
@@ -418,6 +424,49 @@ function Select({
   );
 }
 
+// ── CustomInput component ─────────────────────────────────────────────────────
+// Replaces a dropdown when "Eigen … invullen…" is active.
+// The "terug" button is embedded inside the input on the right side.
+
+function CustomInput({
+  value,
+  onChange,
+  onBack,
+  placeholder,
+  autoFocus = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBack: () => void;
+  placeholder: string;
+  /** Pass true only for the field the user directly interacted with */
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 pr-16 text-sm leading-tight text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
+      />
+      {/* Right-side controls: back button */}
+      <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+        <button
+          type="button"
+          onClick={onBack}
+          title="Terug naar dropdown"
+          className="rounded px-1.5 py-0.5 text-[11px] text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors leading-none"
+        >
+          terug
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ValueCreationPage() {
@@ -431,13 +480,39 @@ export default function ValueCreationPage() {
         if (r.id !== id) return r;
         const updated = { ...r, ...patch };
         // Cascade resets down the hierarchy
-        if ("pillar" in patch) { updated.initiative = ""; updated.action = ""; updated.customAction = ""; }
-        if ("initiative" in patch) { updated.action = ""; updated.customAction = ""; }
-        // customAction is intentionally NOT reset when only action changes,
-        // so the user can switch back to CUSTOM_ACTION_VALUE and recover their text.
+        if ("pillar" in patch) {
+          if (patch.pillar === CUSTOM_PILLAR_VALUE) {
+            // Custom pillar: auto-activate custom inputs for initiative and action
+            // so the user can type straight away without extra clicks.
+            // Preserve any previously typed custom text (recover on re-select).
+            updated.initiative = CUSTOM_INITIATIVE_VALUE;
+            updated.action     = CUSTOM_ACTION_VALUE;
+          } else {
+            // Standard pillar (or cleared): reset initiative and action fully
+            updated.initiative     = "";
+            updated.customInitiative = "";
+            updated.action         = "";
+            updated.customAction   = "";
+          }
+        }
+        if ("initiative" in patch) {
+          if (patch.initiative === CUSTOM_INITIATIVE_VALUE) {
+            // Custom initiative: auto-activate action custom input too
+            updated.action = CUSTOM_ACTION_VALUE;
+            // Preserve customAction text (recovered on re-select)
+          } else {
+            // Standard initiative (or cleared): reset action fully
+            updated.action       = "";
+            updated.customAction = "";
+          }
+        }
+        // customPillar / customInitiative / customAction are intentionally NOT reset
+        // when only a lower level changes, so typed text is recovered on re-select.
         return updated;
       })
     );
+    // Any edit clears the saved (green) state for that row
+    setSavedRows((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }
 
   function addRow() { setRows([...rows, emptyRow(rows)]); }
@@ -445,14 +520,33 @@ export default function ValueCreationPage() {
     if (rows.length > 1) setRows(rows.filter((r) => r.id !== id));
   }
 
+  /** Mark every fully-filled row as saved — all its fields turn green */
+  function handleSave() {
+    const saved = new Set<number>();
+    rows.forEach((r) => {
+      const pillarFilled     = r.pillar     === CUSTOM_PILLAR_VALUE     ? !!(r.customPillar     ?? "").trim() : !!r.pillar;
+      const initiativeFilled = r.initiative === CUSTOM_INITIATIVE_VALUE ? !!(r.customInitiative ?? "").trim() : !!r.initiative;
+      const actionFilled     = r.action     === CUSTOM_ACTION_VALUE     ? !!(r.customAction     ?? "").trim() : !!r.action;
+      if (pillarFilled && initiativeFilled && actionFilled && r.priority && r.owner) saved.add(r.id);
+    });
+    setSavedRows(saved);
+  }
+
+  /** IDs of rows whose all fields should show the saved (green) styling */
+  const [savedRows, setSavedRows] = useState<Set<number>>(new Set());
+
   // Stable display rows: one placeholder row during SSR / before mount
   const [ssrPlaceholder] = useState<Row[]>([emptyRow()]);
   const displayRows = mounted ? rows : ssrPlaceholder;
   const filledCount = mounted
     ? rows.filter((r) => {
+        const pillarFilled =
+          r.pillar     === CUSTOM_PILLAR_VALUE     ? !!(r.customPillar     ?? "").trim() : !!r.pillar;
+        const initiativeFilled =
+          r.initiative === CUSTOM_INITIATIVE_VALUE ? !!(r.customInitiative ?? "").trim() : !!r.initiative;
         const actionFilled =
-          r.action === CUSTOM_ACTION_VALUE ? !!r.customAction.trim() : !!r.action;
-        return r.pillar && r.initiative && actionFilled && r.priority && r.owner;
+          r.action     === CUSTOM_ACTION_VALUE     ? !!(r.customAction     ?? "").trim() : !!r.action;
+        return pillarFilled && initiativeFilled && actionFilled && r.priority && r.owner;
       }).length
     : 0;
 
@@ -505,34 +599,70 @@ export default function ValueCreationPage() {
               return (
                 <div
                   key={row.id}
-                  className="grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_1fr_auto] gap-3 items-start px-6 py-4 hover:bg-blue-50/30 transition-colors group"
+                  className={`grid grid-cols-[1.5fr_2fr_2.5fr_1.2fr_1fr_auto] gap-3 items-start px-6 py-4 transition-colors group border-l-2 ${
+                    savedRows.has(row.id)
+                      ? "bg-green-50/60 border-l-green-300 hover:bg-green-50/80"
+                      : "hover:bg-blue-50/30 border-l-transparent"
+                  }`}
                 >
                   {/* Row number + Pillar */}
-                  <div className="flex items-center gap-2 pt-0.5">
+                  <div className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-xs font-medium flex items-center justify-center group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors mt-px">
                       {idx + 1}
                     </span>
-                    <Select
-                      value={row.pillar}
-                      onChange={(v) => updateRow(row.id, { pillar: v })}
-                      options={PILLAR_NAMES}
-                      placeholder="Pillar…"
-                      optionLabels={PILLAR_LABELS}
-                      accentColor={PILLAR_META[row.pillar]?.color}
-                    />
+                    <div className="flex-1">
+                      {row.pillar === CUSTOM_PILLAR_VALUE ? (
+                        <CustomInput
+                          value={row.customPillar ?? ""}
+                          onChange={(v) => updateRow(row.id, { customPillar: v })}
+                          onBack={() => updateRow(row.id, { pillar: "", customPillar: "" })}
+                          placeholder="Omschrijf je eigen pillar…"
+                          autoFocus
+                        />
+                      ) : (
+                        <Select
+                          value={row.pillar}
+                          onChange={(v) => updateRow(row.id, { pillar: v })}
+                          options={PILLAR_NAMES}
+                          placeholder="Pillar…"
+                          optionLabels={PILLAR_LABELS}
+                          accentColor={PILLAR_META[row.pillar]?.color}
+                          extraOption={{ value: CUSTOM_PILLAR_VALUE, label: CUSTOM_PILLAR_LABEL }}
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Initiative */}
-                  <Select
-                    value={row.initiative}
-                    onChange={(v) => updateRow(row.id, { initiative: v })}
-                    options={initiativeOptions}
-                    placeholder={row.pillar ? "Initiatief…" : "Kies pillar eerst"}
-                    disabled={!row.pillar}
-                  />
+                  {row.initiative === CUSTOM_INITIATIVE_VALUE ? (
+                    <CustomInput
+                      value={row.customInitiative ?? ""}
+                      onChange={(v) => updateRow(row.id, { customInitiative: v })}
+                      onBack={() => updateRow(row.id, { initiative: "", customInitiative: "" })}
+                      placeholder="Omschrijf je eigen initiatief…"
+                      autoFocus={row.pillar !== CUSTOM_PILLAR_VALUE}
+                    />
+                  ) : (
+                    <Select
+                      value={row.initiative}
+                      onChange={(v) => updateRow(row.id, { initiative: v })}
+                      options={initiativeOptions}
+                      placeholder={row.pillar ? "Initiatief…" : "Kies pillar eerst"}
+                      disabled={!row.pillar}
+                      extraOption={row.pillar ? { value: CUSTOM_INITIATIVE_VALUE, label: CUSTOM_INITIATIVE_LABEL } : undefined}
+                    />
+                  )}
 
                   {/* Action */}
-                  <div className="flex flex-col gap-1.5">
+                  {row.action === CUSTOM_ACTION_VALUE ? (
+                    <CustomInput
+                      value={row.customAction}
+                      onChange={(v) => updateRow(row.id, { customAction: v })}
+                      onBack={() => updateRow(row.id, { action: "", customAction: "" })}
+                      placeholder="Omschrijf je eigen actie…"
+                      autoFocus={row.pillar !== CUSTOM_PILLAR_VALUE && row.initiative !== CUSTOM_INITIATIVE_VALUE}
+                    />
+                  ) : (
                     <Select
                       value={row.action}
                       onChange={(v) => updateRow(row.id, { action: v })}
@@ -547,17 +677,7 @@ export default function ValueCreationPage() {
                       disabled={!row.initiative}
                       extraOption={row.initiative ? { value: CUSTOM_ACTION_VALUE, label: CUSTOM_ACTION_LABEL } : undefined}
                     />
-                    {row.action === CUSTOM_ACTION_VALUE && (
-                      <input
-                        type="text"
-                        value={row.customAction}
-                        onChange={(e) => updateRow(row.id, { customAction: e.target.value })}
-                        placeholder="Omschrijf je eigen actie…"
-                        className="w-full rounded-lg border border-blue-300 bg-blue-50/50 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 transition-colors"
-                        autoFocus
-                      />
-                    )}
-                  </div>
+                  )}
 
                   {/* Priority */}
                   <Select
@@ -604,6 +724,7 @@ export default function ValueCreationPage() {
             </button>
 
             <button
+              onClick={handleSave}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50"
               disabled={filledCount === 0}
             >

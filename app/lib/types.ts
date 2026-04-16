@@ -7,9 +7,11 @@
 export interface Row {
   id: number;
   pillar: string;
+  customPillar: string;      // non-empty when pillar === CUSTOM_PILLAR_VALUE
   initiative: string;
+  customInitiative: string;  // non-empty when initiative === CUSTOM_INITIATIVE_VALUE
   action: string;
-  customAction: string;   // non-empty when action === CUSTOM_ACTION_VALUE
+  customAction: string;      // non-empty when action === CUSTOM_ACTION_VALUE
   priority: string;
   owner: string;
 }
